@@ -1,0 +1,3 @@
+# Module gmc
+# RPC service class, partial path of RPC policy file
+gubo.gmc.client.RPCService, 18DA93F676CCDD58ACB846A42D87B311.gwt.rpc

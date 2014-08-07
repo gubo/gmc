@@ -1,0 +1,2 @@
+serviceClass: gubo.gmc.client.RPCService
+path: 18DA93F676CCDD58ACB846A42D87B311.gwt.rpc

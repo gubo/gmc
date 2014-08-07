@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+	version="2.5"
+	xmlns="http://java.sun.com/xml/ns/javaee">
+
+  	<servlet>
+    	<servlet-name>rpcservice</servlet-name>
+    	<servlet-class>gubo.gmc.server.RPCServiceImpl</servlet-class>
+  	</servlet>
+  	<servlet-mapping>
+    	<servlet-name>rpcservice</servlet-name>
+    	<url-pattern>/gmc/rpcservice</url-pattern>
+  	</servlet-mapping>
+
+  	<servlet>
+    	<servlet-name>oauthredirect</servlet-name>
+    	<servlet-class>gubo.gmc.server.OAUTHRedirectServlet</servlet-class>
+  	</servlet>
+  	<servlet-mapping>
+    	<servlet-name>oauthredirect</servlet-name>
+    	<url-pattern>/gmc/oauthredirect</url-pattern>
+  	</servlet-mapping>
+  	
+  	<welcome-file-list>
+    	<welcome-file>index.html</welcome-file>
+  	</welcome-file-list>
+
+</web-app>

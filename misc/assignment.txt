@@ -1,0 +1,29 @@
+Hi Jeff,
+
+The sample code got positive feedback from our developers, therefore we would like to proceed with further evaluations.
+Please find below a programming test. 
+
+Please get the details of programming test as enclosed, we'd like you to build a simple web application using the Google APIs. The specification is purposefully vague, but if there are any questions about what is expected, feel free to contact us.
+The test is due in one week (by August 8th). You can submit the final source code in a zip file.
+
+Goal
+Create a web application to view a GMail user's calendar data, with the option to forward the calendar data in a mail message.
+
+Process
+The application operates as per the following:
+1. The user uses his browser to navigate to the test application.
+2. Authenticate the user via any Google authentication method, OAuth, AuthSub, ClientLogin, etc. (http://code.google.com/apis/accounts/docs/GettingStarted.html) 
+3. User the Google Calendar API to retrieve user calendar data. 
+(https://developers.google.com/google-apps/calendar/)
+4. Retrieve the user's calendar data for the next two weeks and display it.
+5. Allow the user to enter one or more e-mail addresses and click a button to open a GMail compose window prepopulated with the calendar data.
+
+Notes
+Please create your own GMail account for development.
+The test application should be developed in Java and instructions on how to run or see the application working should be provided.
+
+I was hoping to do a hangout interview but I am currently on a trip and the network connection is not enough for video chat. We will do that after I got back to the States next week.
+
+Best regards,
+Edwin Wang
+International Systems Research Co.

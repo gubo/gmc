@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- When updating your version of GWT, you should also update this DTD reference, so that your app can take advantage of the latest GWT module capabilities. -->
+<!DOCTYPE module PUBLIC "-//Google Inc.//DTD Google Web Toolkit 2.6.1//EN" "file:///D:/dev/eclipse.ee.juno/plugins/com.google.gwt.eclipse.sdkbundle_2.6.1/gwt-2.6.1/gwt-module.dtd">
+<module rename-to='gmc'>
+  	<inherits name='com.google.gwt.user.User'/>
+  	<inherits name='com.google.gwt.user.theme.clean.Clean'/>
+  	
+  	<entry-point class='gubo.gmc.client.GMC'/>
+
+  	<source path='client'/>
+  	<source path='shared'/>
+
+  	<add-linker name="xsiframe"/> <!-- allow super dev mode -->
+</module>

@@ -1,0 +1,420 @@
+
+package gubo.gmc.server;
+
+import java.io.*;
+import java.net.*;
+
+import com.google.api.services.gmail.Gmail;
+import com.google.appengine.api.oauth.*;
+import com.google.appengine.api.users.*;
+import com.google.appengine.api.urlfetch.*;
+
+import com.google.gson.*;
+import com.google.gwt.user.server.rpc.*;
+
+import gubo.gmc.client.*;
+import gubo.gmc.shared.*;
+
+@SuppressWarnings( { "nls","serial" } )
+public class RPCServiceImpl extends RemoteServiceServlet implements RPCService 
+{
+	@Override
+	public Ping ping( final String name ) throws IllegalArgumentException {
+		if ( name == null ) { throw new IllegalArgumentException( "name is null" ); }
+		final Ping ping = new Ping();
+		try {
+			final String ename = escapeHTML( name );
+			ping.greeting = "greetings " + ename;
+		} catch ( Exception x ) {
+			DBG.m( x );
+		}
+		return ping;
+	}
+
+	@Override
+	public String getUUID() throws IllegalArgumentException {
+		return java.util.UUID.randomUUID().toString();
+	}
+	
+	@Override
+	public AuthorizationRequest requestAuthorization() throws IllegalArgumentException {
+		final AuthorizationRequest authorizationrequest = new AuthorizationRequest();
+		try {
+			final String scope = 	GMC.LOGIN_SCOPE_EMAIL + "%20" + 
+									GMC.LOGIN_SCOPE_CALENDAR + "%20" + GMC.LOGIN_SCOPE_CALENDAR_READONLY + "%20" + 
+									GMC.LOGIN_SCOPE_GMAIL_COMPOSE;
+			
+			final String state = GMC.fakeEmailAddress;
+			
+			final StringBuilder querybuilder = new StringBuilder();
+			querybuilder.append( "?response_type=code" );
+			querybuilder.append( "&client_id=" + GMC.CLIENT_ID );
+			querybuilder.append( "&redirect_uri=" + GMC.REDIRECT_URL );
+			querybuilder.append( "&scope=" + scope );
+			querybuilder.append( "&access_type=online" );
+			querybuilder.append( "&approval_prompt=force" );
+			querybuilder.append( "&state=" + state );
+			final String query = querybuilder.toString();
+							          
+			final String _url = "https://accounts.google.com/o/oauth2/auth" + query;
+			
+			final URL url = new URL( _url );
+			final FetchOptions fetchOptions = FetchOptions.Builder.doNotFollowRedirects();
+			final HTTPRequest httpRequest = new HTTPRequest( url,HTTPMethod.GET,fetchOptions );
+			
+			final URLFetchService fetchService = URLFetchServiceFactory.getURLFetchService();
+			final com.google.appengine.api.urlfetch.HTTPResponse httpResponse = fetchService.fetch( httpRequest );
+			
+			final int responseCode = httpResponse.getResponseCode();
+			switch ( responseCode ) {
+			case 302:
+				for ( final HTTPHeader header : httpResponse.getHeaders() ) {
+					DBG.m( header.getName() + " " + header.getValue() );
+					if ( "Location".equalsIgnoreCase( header.getName() ) ) {
+						authorizationrequest.redirectURL = header.getValue();
+					}
+				}
+				break;
+			default:
+				throw new Exception( "failed request authorization: " + responseCode );
+			}
+		} catch ( Exception x ) {
+			DBG.m( x );
+		}
+		return  authorizationrequest;
+	}
+	
+	@Override
+	public Authorization getAuthorization() throws IllegalArgumentException {
+		final Authorization authorization = new Authorization(); 
+		try {
+			final EMail email = new EMail();
+			try {
+				final OAuthService oauthService = OAuthServiceFactory.getOAuthService();
+				final User user = oauthService.getCurrentUser();
+				email.address = user.getEmail();
+			} catch ( Exception x ) {
+				email.address = GMC.fakeEmailAddress; // TODO: this is a temporary hack
+				DBG.m( x );
+			}
+			final Authorization a = Data.authorizations.get( email );
+			if ( a != null ) {
+				authorization.emailaddress = a.emailaddress;
+				authorization.accessCode = a.accessCode;
+				authorization.token = a.token;
+			}
+		} catch ( Exception x ) {
+			DBG.m( x );
+		}
+		return authorization;
+	}
+
+	private static String escapeHTML( final String html ) {
+		if ( html == null ) { return null;  }
+		return html.replaceAll( "&", "&amp;" ).replaceAll( "<", "&lt;" ).replaceAll( ">", "&gt;" );
+	}
+
+	@Override
+	public Authorization rmvAuthorization() throws IllegalArgumentException {
+		final Authorization authorization = new Authorization(); 
+		try {
+			final EMail email = new EMail();
+			try {
+				final OAuthService oauthService = OAuthServiceFactory.getOAuthService();
+				final User user = oauthService.getCurrentUser();
+				email.address = user.getEmail();
+			} catch ( Exception x ) {
+				email.address = GMC.fakeEmailAddress; // TODO: this is a temporary hack
+				DBG.m( x );
+			}
+			final Authorization a = Data.authorizations.get( email );
+			if ( a != null ) {
+				authorization.emailaddress = a.emailaddress;
+				authorization.accessCode = a.accessCode;
+				authorization.token = a.token;
+			}
+			Data.authorizations.remove( email );
+		} catch ( Exception x ) {
+			DBG.m( x );
+		}
+		return authorization;
+	}
+
+	/*
+	 * https://developers.google.com/google-apps/calendar/v3/reference/calendarList/list#examples
+	 */
+	@Override
+	public CalendarList getCalendarList( final Authorization authorization ) throws IllegalArgumentException {
+		CalendarList calendarlist = new CalendarList(); 
+		try {
+			final StringBuilder querybuilder = new StringBuilder();
+			querybuilder.append( "?key=" + GMC.API_KEY );
+			final String query = querybuilder.toString();
+			
+			final String _url = "https://www.googleapis.com/calendar/v3/users/me/calendarList" + query;
+			DBG.m( "StringBuilder: " + _url );
+
+			final URL url = new URL( _url );
+			final FetchOptions fetchOptions = FetchOptions.Builder.doNotFollowRedirects();
+			final HTTPRequest httpRequest = new HTTPRequest( url,HTTPMethod.GET,fetchOptions );
+			httpRequest.setHeader( new HTTPHeader( "Authorization","Bearer " + authorization.token.access_token ) );
+			
+			final URLFetchService fetchService = URLFetchServiceFactory.getURLFetchService();
+			final com.google.appengine.api.urlfetch.HTTPResponse httpResponse = fetchService.fetch( httpRequest );
+			
+			final int responseCode = httpResponse.getResponseCode();
+			switch ( responseCode ) {
+			case 200:
+				final String json = new String( httpResponse.getContent(),"UTF-8" );
+				calendarlist = new Gson().fromJson( json,CalendarList.class );
+				break;
+			default:
+				throw new Exception( "failed get calendarList: " + responseCode );
+			}
+		} catch ( Exception x ) {
+			DBG.m( x );
+		}
+		return calendarlist;
+	}
+
+	@Override
+	public CalendarEvents getCalendarEvents( final Authorization authorization,final String calendarId ) throws IllegalArgumentException {
+		CalendarEvents calendarevents = new CalendarEvents(); 
+		try {
+			final StringBuilder querybuilder = new StringBuilder();
+			querybuilder.append( "?key=" + GMC.API_KEY );
+			final String query = querybuilder.toString();
+			
+			final String idpart = URLEncoder.encode( ""+calendarId,"UTF-8" ); 
+			final String _url = "https://www.googleapis.com/calendar/v3/calendars/" + idpart + "/events" + query;
+			DBG.m( "StringBuilder: " + _url );
+
+			final URL url = new URL( _url );
+			final FetchOptions fetchOptions = FetchOptions.Builder.doNotFollowRedirects();
+			final HTTPRequest httpRequest = new HTTPRequest( url,HTTPMethod.GET,fetchOptions );
+			httpRequest.setHeader( new HTTPHeader( "Authorization","Bearer " + authorization.token.access_token ) );
+			
+			final URLFetchService fetchService = URLFetchServiceFactory.getURLFetchService();
+			final com.google.appengine.api.urlfetch.HTTPResponse httpResponse = fetchService.fetch( httpRequest );
+			
+			final int responseCode = httpResponse.getResponseCode();
+			switch ( responseCode ) {
+			case 200:
+				final String json = new String( httpResponse.getContent(),"UTF-8" );
+				calendarevents = new Gson().fromJson( json,CalendarEvents.class );
+				break;
+			default:
+				throw new Exception( "failed get calendarEvents: " + responseCode );
+			}
+		} catch ( Exception x ) {
+			DBG.m( x );
+		}
+		return calendarevents;
+	}
+
+	@Override
+	public String requestSend( final Authorization authorization,final CalendarListItem calendar ) throws IllegalArgumentException {
+		String result = "ok";
+//		try {
+//			final StringBuilder querybuilder = new StringBuilder();
+//			querybuilder.append( "?key=" + GMC.API_KEY );
+//			final String query = querybuilder.toString();
+//
+//			final String _url = "https://www.googleapis.com/gmail/v1/users/me/messages/send" + query;
+//			
+//			DBG.m( "requestSend: " + _url );
+//			
+//			final String payload = createEncodedEmail( "user.tau.lepton@gmail.com",calendar.id,"TESTING FROM GCM","HELLO, HOP THIS FINDS U WELL." );
+//			
+//			final URL url = new URL( _url );
+//			final FetchOptions fetchOptions = FetchOptions.Builder.doNotFollowRedirects();
+//			final HTTPRequest httpRequest = new HTTPRequest( url,HTTPMethod.POST,fetchOptions );
+//			httpRequest.setHeader( new HTTPHeader( "Content-Type","application/json" ) );
+//			httpRequest.setHeader( new HTTPHeader( "Authorization","Bearer " + authorization.token.access_token ) );
+//			httpRequest.setPayload( payload.getBytes() );
+//			
+//			final URLFetchService fetchService = URLFetchServiceFactory.getURLFetchService();
+//			final com.google.appengine.api.urlfetch.HTTPResponse httpResponse = fetchService.fetch( httpRequest );
+//			
+//			final int responseCode = httpResponse.getResponseCode();
+//			switch ( responseCode ) {
+//			case 200:
+//				final String json = new String( httpResponse.getContent(),"UTF-8" );
+//				final DraftResponse draftresponse = new Gson().fromJson( json,DraftResponse.class );
+//				send( authorization,calendar,draftresponse );
+//				break;
+//			case 400:
+//				final String badresponse = new String( httpResponse.getContent(),"UTF-8" );
+//				DBG.m( badresponse );
+//				break;
+//			default:
+//				throw new Exception( "failed get calendarEvents: " + responseCode );
+//			}
+//		} catch ( Exception x ) {
+//			DBG.m( x );
+//		}
+		
+		final javax.mail.internet.MimeMessage email = createMimeMessage( "user.tau.lepton@gmail.com",calendar.id,"TEST FROM GMC","HEY FUNKY MONKEY" );
+		final com.google.api.services.gmail.model.Message message = createMessageWithEmail( email );
+		Gmail.Builder()authorization.new com.google.api.services.gmail.Gmail.Builder()
+	    message = service.users().messages().send(userId, message).execute();		
+		return result;
+	}
+
+	public static javax.mail.internet.MimeMessage createMimeMessage( final String to,final String from,final String subject,final String body ) throws javax.mail.MessagingException {
+		javax.mail.internet.MimeMessage email = null;
+		
+		try {
+			final java.util.Properties props = new java.util.Properties();
+			final javax.mail.Session session = javax.mail.Session.getDefaultInstance( props,null );
+
+			email = new javax.mail.internet.MimeMessage( session );
+			final javax.mail.internet.InternetAddress toAddress = new javax.mail.internet.InternetAddress( to );
+			final javax.mail.internet.InternetAddress fromAddress = new javax.mail.internet.InternetAddress( from );
+
+			email.setFrom( fromAddress );
+			email.addRecipient( javax.mail.Message.RecipientType.TO,toAddress );
+			email.setSubject( subject );
+			email.setText( body );
+		} finally {}
+		
+		return email;
+	}
+	
+	public static com.google.api.services.gmail.model.Message createMessage( final javax.mail.internet.MimeMessage email ) throws javax.mail.MessagingException,IOException {
+		final com.google.api.services.gmail.model.Message message = new com.google.api.services.gmail.model.Message();
+		
+		try {
+			final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			email.writeTo( baos );
+			final String encodedEmail = com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64.encodeBase64URLSafeString( baos.toByteArray() );
+			message.setRaw( encodedEmail );
+		} finally {}
+		
+		return message;
+	}	
+	
+	public static String createEncodedEmail( final String to,final String from,final String subject,final String body ) throws javax.mail.MessagingException,IOException {
+		String encoded = null;
+		
+		ByteArrayOutputStream output = null;
+		try {
+			final java.util.Properties props = new java.util.Properties();
+			final javax.mail.Session session = javax.mail.Session.getDefaultInstance( props,null );
+
+			final javax.mail.internet.MimeMessage email = new javax.mail.internet.MimeMessage( session );
+			final javax.mail.internet.InternetAddress toAddress = new javax.mail.internet.InternetAddress( to );
+			final javax.mail.internet.InternetAddress fromAddress = new javax.mail.internet.InternetAddress( from );
+
+			email.setFrom( fromAddress );
+			email.addRecipient( javax.mail.Message.RecipientType.TO,toAddress );
+			email.setSubject( subject );
+			email.setText( body );
+			
+			output = new ByteArrayOutputStream();
+			email.writeTo( output );
+			encoded = com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64.encodeBase64URLSafeString( output.toByteArray() );
+		} finally {
+			try { if ( output != null ) { output.close(); } } catch ( IOException x ) {}
+		}
+		return encoded;
+	}
+	
+	private static com.google.api.services.gmail.model.Message createMessageWithEmail( final javax.mail.internet.MimeMessage email ) throws javax.mail.MessagingException,IOException {
+		final com.google.api.services.gmail.model.Message message = new com.google.api.services.gmail.model.Message();
+		ByteArrayOutputStream output = null;
+		try {
+			output = new ByteArrayOutputStream();
+			email.writeTo( output );
+			final String encodedEmail = com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64.encodeBase64URLSafeString( output.toByteArray() );
+			message.setRaw( encodedEmail );
+		} finally {
+			try { if ( output != null ) { output.close(); } } catch ( IOException x ) {}
+		}
+		return message;
+	}
+	
+	private void draft( final Authorization authorization,final CalendarListItem calendar ) throws IllegalArgumentException {
+		try {
+			final StringBuilder querybuilder = new StringBuilder();
+			querybuilder.append( "?key=" + GMC.API_KEY );
+			final String query = querybuilder.toString();
+
+			final String idpart = URLEncoder.encode( ""+calendar.id,"UTF-8" );
+			final String _url = "https://www.googleapis.com/gmail/v1/users/" + idpart + "/drafts" + query;
+			
+			DBG.m( "draft: " + _url );
+			
+			final DraftRequest draftrequest = new DraftRequest();
+			draftrequest.id = calendar.id;
+			draftrequest.message = new DraftRequestMessage();
+			draftrequest.message.raw = "hello this is gmc";
+			final String payload = new Gson().toJson( draftrequest );
+			
+			final URL url = new URL( _url );
+			final FetchOptions fetchOptions = FetchOptions.Builder.doNotFollowRedirects();
+			final HTTPRequest httpRequest = new HTTPRequest( url,HTTPMethod.POST,fetchOptions );
+			httpRequest.setHeader( new HTTPHeader( "Content-Type","application/json" ) );
+			httpRequest.setHeader( new HTTPHeader( "Authorization","Bearer " + authorization.token.access_token ) );
+			httpRequest.setPayload( payload.getBytes() );
+			
+			final URLFetchService fetchService = URLFetchServiceFactory.getURLFetchService();
+			final com.google.appengine.api.urlfetch.HTTPResponse httpResponse = fetchService.fetch( httpRequest );
+			
+			final int responseCode = httpResponse.getResponseCode();
+			switch ( responseCode ) {
+			case 200:
+				final String json = new String( httpResponse.getContent(),"UTF-8" );
+				final DraftResponse draftresponse = new Gson().fromJson( json,DraftResponse.class );
+				send( authorization,calendar,draftresponse );
+				break;
+			default:
+				throw new Exception( "failed get calendarEvents: " + responseCode );
+			}
+		} catch ( Exception x ) {
+			DBG.m( x );
+		}
+	}
+
+	private void send( final Authorization authorization,final CalendarListItem calendar,final DraftResponse draftresponse ) throws Exception {
+		final StringBuilder querybuilder = new StringBuilder();
+		querybuilder.append( "?key=" + GMC.API_KEY );
+		final String query = querybuilder.toString();
+
+		final String idpart = URLEncoder.encode( ""+calendar.id,"UTF-8" );
+		final String _url = "https://www.googleapis.com/gmail/v1/users/" + idpart + "/drafts/send" + query;
+		
+		DBG.m( "send: " + _url );
+		
+		final String payload = draftresponse.message.id;
+		
+		final URL url = new URL( _url );
+		final FetchOptions fetchOptions = FetchOptions.Builder.doNotFollowRedirects();
+		final HTTPRequest httpRequest = new HTTPRequest( url,HTTPMethod.POST,fetchOptions );
+		httpRequest.setHeader( new HTTPHeader( "Content-Type","application/json" ) );
+		httpRequest.setHeader( new HTTPHeader( "Authorization","Bearer " + authorization.token.access_token ) );
+		httpRequest.setPayload( payload.getBytes() );
+		
+		final URLFetchService fetchService = URLFetchServiceFactory.getURLFetchService();
+		final com.google.appengine.api.urlfetch.HTTPResponse httpResponse = fetchService.fetch( httpRequest );
+		
+		final int responseCode = httpResponse.getResponseCode();
+		switch ( responseCode ) {
+		case 200:
+			final String json = new String( httpResponse.getContent(),"UTF-8" );
+			DBG.m( json );
+			break;
+		default:
+			throw new Exception( "failed get calendarEvents: " + responseCode );
+		}
+	}
+}
+
+
+
+
+
+
+
+
+

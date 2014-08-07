@@ -1,0 +1,51 @@
+
+.cellTableHeader {}
+.cellTableFirstColumnHeader {}
+.cellTableLastColumnHeader {}
+
+.cellTableCell {
+	padding: 0px;
+	margin: 1em 0em 1em 0em;
+	overflow: hidden;
+	font-family: "Verdana",serif;
+	font-size: 2.75em;
+	font-weight: bold;
+	color: #454545;
+}
+
+.cellTableEvenRow {
+	background: #FFFFFF;
+}
+
+.cellTableOddRow {
+	background: #F0F0F0;
+}
+
+.cellTableSelectedRow {
+	background: #AAAAAA;
+}
+
+.cellTableSelectedRowCell {
+	border: none;
+}
+
+.cellTableHoveredRow {
+	background: #DDCCDD;
+}
+
+.cellTableHoveredRowCell {
+	border: none;
+}
+
+.cellTableKeyboardSelectedRow {
+	background: #ffc;
+}
+
+.cellTableKeyboardSelectedRowCell {
+	border: none;
+}
+
+.cellTableKeyboardSelectedCell {
+	border: none;
+}
+

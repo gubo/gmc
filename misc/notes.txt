@@ -1,0 +1,7 @@
+
+- google calendar apis (alpha) dont work ... abandoned after waste half day
+- cannot resolve browser cache problem when using dev server ... redirects end up on old page/script .. even recompile and hard clean cache 
+- ISSUE 7527: java.lang.ClassNotFoundException: com.google.gwt.core.client.GWTBridge occurs if i put these static final initialize outside of method
+- all of a sudden oauth2 dialog not honor "email%20profile" ... either 400 or ask for offline access
+- why sometimes oauth2 dialog ask for offline access when i ask for email ?
+- OAuthService not working on deployed (returns null from getCurrentUser)
